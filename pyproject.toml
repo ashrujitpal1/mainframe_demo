@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "mainframe-demo"
+version = "0.1.0"
+description = "GenAI application using StateManager with Ollama"
+authors = ["ashrujitpal <ashrujitpal1@gmail.com>"]
+readme = "README.md"
+packages = [{include = "mainframe_demo"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<=3.13"
+langchain-community = "^0.3.7"
+langchain-anthropic = "^0.3.0"
+langchain-experimental = "^0.3.3"
+langgraph = "^0.2.53"
+requests = "^2.31.0"
+python-dotenv = "^1.0.0"
+pydantic-settings = "^2.6.1"
+langchain-ollama = "^0.2.0"
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
