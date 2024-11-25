@@ -11,13 +11,14 @@ class StoryGeneratorTool(BaseTool):
 
     def _run(self, business_rule: str) -> Dict[str, Any]:
         try:
-            print(" Within the _run method of StoryGeneratorTool ::::: {business_rule}")
+            
             response = requests.post(
                 settings.STORY_GENERATOR_URL,
                 json={"topic": business_rule},
                 timeout=300
             )
-            response.raise_for_status()
+            #response.raise_for_status()
+            print(f"Response from story generator: {response.json()}")
             return response.json()
         except Exception as e:
             logging.error(f"Error generating story: {str(e)}")

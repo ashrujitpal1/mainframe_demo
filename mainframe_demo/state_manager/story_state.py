@@ -172,7 +172,7 @@ def process_business_rule(business_rule: str) -> Dict[str, Any]:
         print(f"app.invoke result: {result}")
         
         print("Graph invoked")
-        # Process result
+
         # if result.errors:
         #     return {
         #         "status": "error",
@@ -182,7 +182,9 @@ def process_business_rule(business_rule: str) -> Dict[str, Any]:
         
         return {
             "status": "success",
-            "story": result
+            "story": result,
+            "metadata": result.metadata,
+
         }
         
     except Exception as e:
