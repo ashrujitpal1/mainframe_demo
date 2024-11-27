@@ -6,132 +6,62 @@ logging.basicConfig(level=logging.INFO)
 def main():
     # Example business rule
     business_rule = """
-        Result value: Modernized Business Rule Definition
+        The following business rules are extracted from the COBOL program for the Loan Management System, tailored to a modern development perspective:
 
-        ### Domain Analysis
+        1. Loan Account Management
+        Loan Account Creation:
 
-        The business capabilities extracted from the COBOL program for the Loan Management System can be mapped to the following DDD Subdomains:
+        Each loan account must have a unique Loan Account Number, a Customer Name, an Initial Loan Amount, and an Interest Rate.
+        Loan accounts are categorized by status: Active, Closed.
+        Loan Account Update:
 
-        1. **Loan Management**
-            * Bounded Context: Loan Account Management
-            * Entities:
-                + LoanAccount (with attributes: accountNumber, customerName, loanAmount, outstandingAmount, interestRate)
-                + Transaction (with attributes: transactionType, transactionAmount)
-            * Value Objects:
-                + OutstandingAmount
-                + InterestRate
-        2. **Transaction Processing**
-            * Bounded Context: Transaction Management
-            * Entities:
-                + LoanTransaction (with attributes: accountNumber, transactionType, transactionAmount)
-            * Aggregates:
-                + LoanAccountAggregate (comprising LoanAccount and its transactions)
-        3. **Reporting and Analytics**
-            * Bounded Context: Reporting
-            * Entities:
-                + Report (with attributes: reportDate, loanAccountStatuses)
-
-        ### Entity and Context Mapping
-
-        The mainframe-oriented data structures can be redefined as:
-
-        1. **Loan Account**: Redefined as LoanAccount Entity with attributes accountNumber, customerName, loanAmount, outstandingAmount, interestRate
-        2. **Transaction File**: Redefined as Transaction Entity with attributes transactionType, transactionAmount
-        3. **Report File**: Redefined as Report Entity with attributes reportDate, loanAccountStatuses
-
-        The COBOL programs or procedures can be mapped to potential Microservices:
-
-        1. **Loan Account Management**: Map to LoanManagementMicroservice (handles creation, update, and retrieval of loan accounts)
-        2. **Transaction Processing**: Map to TransactionProcessingMicroservice (handles processing of transactions and updating loan accounts)
-        3. **Reporting and Analytics**: Map to ReportingMicroservice (generates reports on loan account statuses)
-
-        ### Microservices Definition
-
-        The microservices boundary for each business capability can be defined as:
-
-        1. **Loan Management**: LoanManagementMicroservice
-        2. **Transaction Processing**: TransactionProcessingMicroservice
-        3. **Reporting and Analytics**: ReportingMicroservice
-
-        **APIs:**
-
-        1. **Loan Management**
-            * `POST /loan-accounts`: Create a new loan account
-            * `GET /loan-accounts/{accountNumber}`: Retrieve a loan account by account number
-        2. **Transaction Processing**
-            * `POST /transactions`: Process a transaction
-            * `GET /transactions/{transactionId}`: Retrieve a transaction by ID
-        3. **Reporting and Analytics**
-            * `GET /reports`: Generate a report on loan account statuses
-
-        ### Technical Requirements
-
-        1. **Database Migration**: Migrate from IMS/VSAM to RDBMS (e.g., PostgreSQL) or NoSQL (e.g., MongoDB)
-        2. **Caching Mechanisms**: Implement caching using Redis or Memcached for frequently accessed data
-        3. **Event-Driven Architecture**: Use Apache Kafka or RabbitMQ as event store and message broker
-        4. **Event-Driven Recommendations**:
-            * Identify key business events: Loan Account Creation, Transaction Processing, Report Generation
-            * Map these to Domain Events (e.g., `LoanAccountCreated`, `TransactionProcessed`, `ReportGenerated`)
-        5. **Integration Considerations**: Use APIs or data pipelines for seamless mainframe-Java integration
-
-        ### Acceptance Criteria
-
-        1. Functional Requirements:
-            * Correctly created and updated loan accounts
-            * Successfully processed transactions
-            * Generated accurate reports on loan account statuses
-        2. Non-Functional Requirements:
-            * Response time: < 500ms for API calls
-            * Throughput: handle >1000 concurrent requests per second
-            * Scalability: scale to >10000 instances
-
-        ### Sample Design Blueprint
-
-        ```
-        +---------------+
-        |  Loan Management  |
-        +---------------+
-                |
-                |  POST /loan-accounts
-                v
-        +---------------+---------------+
-        |  CreateLoanAccount  |
-        +---------------+---------------+
-                |
-                |  GET /loan-accounts/{accountNumber}
-                v
-        +---------------+---------------+
-        |  RetrieveLoanAccount  |
-        +---------------+---------------+
-
-        +---------------+
-        | Transaction Processing  |
-        +---------------+
-                |
-                |  POST /transactions
-                v
-        +---------------+---------------+
-        |  ProcessTransaction  |
-        +---------------+---------------+
-                |
-                |  GET /transactions/{transactionId}
-                v
-        +---------------+---------------+
-        |  RetrieveTransaction  |
-        +---------------+---------------+
-
-        +---------------+
-        | Reporting and Analytics  |
-        +---------------+
-                |
-                |  GET /reports
-                v
-        +---------------+---------------+
-        |  GenerateReport  |
-        +---------------+---------------+
-        ```
-
-        This design blueprint provides a high-level overview of the modernized business rule definition, entity and context mapping, microservices definition, technical requirements, acceptance criteria, and sample design blueprint.
+        When a loan account is processed:
+        If the status is Active, calculate and update the Outstanding Loan Amount with interest.
+        Accounts with a balance of zero or less after repayment are marked as Closed.
+        2. Input Validation
+        All loan account details and transaction records must meet the following criteria:
+        Loan Account Number: Unique, numeric, 10 digits.
+        Customer Name: Alphanumeric, up to 30 characters.
+        Interest Rate: Numeric, with up to two decimal places.
+        Transaction Amount: Numeric, with up to two decimal places.
+        Transactions must have a valid Transaction Type:
+        DISBURSEMENT or REPAYMENT.
+        3. Interest Calculation
+        Formula:
+        Updated Outstanding Amount = Outstanding Amount + (Outstanding Amount × Interest Rate / 100)
+        Interest is added to the Outstanding Loan Amount only for active loans during processing.
+        4. Loan Transactions
+        Disbursement:
+        Adds the transaction amount to the Outstanding Loan Amount of the specified loan account.
+        Repayment:
+        Subtracts the transaction amount from the Outstanding Loan Amount of the specified loan account.
+        If the Outstanding Loan Amount becomes zero or negative, the loan account status is updated to Closed.
+        Transactions are only applied to loan accounts with a matching Loan Account Number.
+        5. File Handling
+        Loan Account File:
+        Stores loan account details including account number, customer name, loan amount, outstanding amount, interest rate, and status.
+        Opened in line-sequential mode to ensure data integrity.
+        Transaction File:
+        Stores transaction records including account number, transaction type, and transaction amount.
+        Processed sequentially to update loan accounts.
+        Report File:
+        Generates a loan management report summarizing account statuses after processing.
+        6. Multi-Account Processing
+        The system processes multiple loan accounts sequentially:
+        Reads loan account records.
+        Applies transactions from the Transaction File.
+        After processing each transaction, the Loan Account File is updated immediately to prevent data loss or corruption.
+        7. Reporting
+        The system generates a Loan Management Report summarizing the results:
+        Includes details of all processed accounts, outstanding balances, and their statuses.
+        A header and separator are included for better readability.
+        8. Error Handling
+        If a transaction refers to an invalid or missing account number:
+        Display an error message: "Account Not Found: [Account Number]".
+        Invalid transaction types or missing details are flagged as errors and ignored.
+        9. System Termination
+        The system gracefully closes all files after processing.
+        Displays a success message: "Loan Management System Terminated Successfully. 
     """
     
     # Process the business rule
@@ -139,7 +69,7 @@ def main():
     
     if result["status"] == "success":
         print("\nGenerated User Story:")
-        print(result["story"])
+        print(result)
     else:
         print("\nError:")
         print(result.get("errors") or result.get("error"))

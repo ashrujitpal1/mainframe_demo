@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Any, List, Tuple, Optional
 #from langchain_community.llms import Ollama
 # Import OllamaLM from langchain_ollama
@@ -8,12 +9,14 @@ from langgraph.prebuilt import ToolExecutor, ToolInvocation
 from pydantic import BaseModel, Field
 from mainframe_demo.tools.story_generator import StoryGeneratorTool
 from mainframe_demo.config.settings import settings
+from mainframe_demo.tools.user_story_generator import UserStoryAPITool
 
 class AgentState(BaseModel):
     """Represents the current state of the agent"""
     input: str = Field(description="The input business rule")
     current_step: str = Field(description="Current step in the process")
     generated_story: Optional[Dict] = Field(default=None, description="Generated user story")
+    user_stories: Optional[Dict] = Field(default=None, description="Generated user stories from API")
     errors: List[str] = Field(default_factory=list, description="Any errors encountered")
     completed: bool = Field(default=False, description="Whether the process is complete")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
@@ -23,7 +26,7 @@ def create_story_graph() -> StateGraph:
     print("Within the create_story_graph method ::::: ")
     
     # Initialize tools
-    tools = [StoryGeneratorTool()]
+    tools = [StoryGeneratorTool(), UserStoryAPITool()]
     tool_executor = ToolExecutor(tools)
     
     # Initialize LLM
@@ -32,28 +35,33 @@ def create_story_graph() -> StateGraph:
         model=settings.MODEL_NAME
     )
 
-    # # Define the analysis step
-    # analysis_prompt = ChatPromptTemplate.from_messages([
-    #     ("system", """You are a Scrum Master expert in generating user story.
-    #      From the user input, identify if the input is to create the user stories. 
-    #      You use the Tool: StoryGeneratorTool to generate the user stories"""),
-    #     ("user", "{input}")
-    # ])
-    # print("after the analysis_prompt method ::::: ")
+    # Add new function to generate user stories
+    def generate_user_stories(state: AgentState) -> AgentState:
+        """Generates user stories using the API"""
+        print("Within generate_user_stories method")
+        try:
+            print(f"before the tool_executor.invoke method ::::")
+            tool_invocation = ToolInvocation(
+                tool="user_story_api",
+                tool_input=state.input
+            )
+            
+            result = tool_executor.invoke(tool_invocation)
 
-    # def analyze_input(state: AgentState) -> AgentState:
-    #     """Analyzes the input business rule"""
-    #     try:
-    #         print("Within the analyze_input method")
-    #         prompt = analysis_prompt.format_messages(input=state.input)
-    #         print(prompt)
-    #         analysis = llm.invoke(prompt)
-    #         state.current_step = "analysis_completed"
-    #         return state
-    #     except Exception as e:
-    #         state.errors.append(f"Analysis error: {str(e)}")
-    #         state.completed = True
-    #         return state
+            story_data = {
+                "generated_story": state.input,  # Your generated story value
+                "user_stories": result.get('data')       # Your user stories value
+            }
+            
+            state.input = story_data
+            state.current_step = "user_stories_generated"
+            state.completed = True
+            return state
+        except Exception as e:
+            print(f"Error in API call:")
+            state.errors.append(f"User stories generation error: {str(e)}")
+            state.completed = True
+            return state    
 
     # Define the generation step
     def generate_story(state: AgentState) -> AgentState:
@@ -68,8 +76,9 @@ def create_story_graph() -> StateGraph:
             )
             
             result = tool_executor.invoke(tool_invocation)
+            print(f"after the tool_executor.invoke method ::::")
             
-            state.generated_story = result
+            state.input = result.get('data')
             state.current_step = "generation_completed"
             print("after the tool_executor.invoke method :::: ")
             return state
@@ -79,31 +88,6 @@ def create_story_graph() -> StateGraph:
             state.completed = True
             return state
 
-    # # Define the review step
-    # review_prompt = ChatPromptTemplate.from_messages([
-    #     ("system", """Review the generated user story. Ensure it:
-    #     1. Follows proper user story format
-    #     2. Captures all requirements
-    #     3. Includes acceptance criteria
-    #     4. Is clear and actionable"""),
-    #     ("user", "{story}")
-    # ])
-
-    # def review_story(state: AgentState) -> AgentState:
-    #     """Reviews and enhances the generated story"""
-    #     try:
-    #         if state.generated_story:
-    #             review = llm.invoke(review_prompt.format_messages(
-    #                 story=str(state.generated_story)
-    #             ))
-    #             state.generated_story["review"] = review
-    #         state.current_step = "review_completed"
-    #         state.completed = True
-    #         return state
-    #     except Exception as e:
-    #         state.errors.append(f"Review error: {str(e)}")
-    #         state.completed = True
-    #         return state
 
     # Define the router
     def router(state: AgentState) -> str:
@@ -114,9 +98,9 @@ def create_story_graph() -> StateGraph:
             return END
         if state.current_step == "":
             return "generate"
-        # if state.current_step == "analysis_completed":
-        #     return "generate"
         if state.current_step == "generation_completed":
+            return "generate_user_stories"
+        if state.current_step == "user_stories_generated":
              return END
         return END
 
@@ -124,19 +108,17 @@ def create_story_graph() -> StateGraph:
     workflow = StateGraph(AgentState)
     
     # Add nodes
-    #workflow.add_node("analyze", analyze_input)
     workflow.add_node("generate", generate_story)
-    #workflow.add_node("review", review_story)
-    
+    workflow.add_node("generate_user_stories", generate_user_stories)
+       
     # Add edges
-    #workflow.add_edge("analyze", "generate")
-    # workflow.add_edge("generate", "review")
-    # workflow.add_edge("review", END)
-    workflow.add_edge("generate", END)
+    workflow.add_edge("generate", "generate_user_stories")
+    workflow.add_edge("generate_user_stories", END)
     
     # Set entry point
     workflow.set_entry_point("generate")
     print("after the workflow method ::::: ")
+    
     return workflow
 
 def process_business_rule(business_rule: str) -> Dict[str, Any]:
@@ -169,7 +151,6 @@ def process_business_rule(business_rule: str) -> Dict[str, Any]:
         )
         print("Graph compiled")
         result = app.invoke(initial_state)
-        print(f"app.invoke result: {result}")
         
         print("Graph invoked")
 
@@ -182,9 +163,7 @@ def process_business_rule(business_rule: str) -> Dict[str, Any]:
         
         return {
             "status": "success",
-            "story": result,
-            "metadata": result.metadata,
-
+            "result": result
         }
         
     except Exception as e:
